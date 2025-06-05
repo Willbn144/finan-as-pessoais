@@ -3,1030 +3,727 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeepSite V2 - Planilha de Finanças Pessoais</title>
+    <title>Painel Financeiro Pessoal</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-            animation: fadeIn 0.3s ease-in-out;
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
         }
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .sidebar {
+            transition: transform 0.3s ease;
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                position: fixed;
+                z-index: 50;
+                height: 100vh;
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            .overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: rgba(0,0,0,0.5);
+                z-index: 40;
+            }
+            .overlay.open {
+                display: block;
+            }
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
         }
         .progress-bar {
-            transition: width 0.6s ease;
+            width: 100%;
+            height: 10px;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
         }
-        .scroll-container {
-            scrollbar-width: thin;
-            scrollbar-color: #3b82f6 #e5e7eb;
-        }
-        .scroll-container::-webkit-scrollbar {
-            height: 8px;
-            width: 8px;
-        }
-        .scroll-container::-webkit-scrollbar-track {
-            background: #e5e7eb;
-            border-radius: 4px;
-        }
-        .scroll-container::-webkit-scrollbar-thumb {
-            background-color: #3b82f6;
-            border-radius: 4px;
-        }
-        #sidebar {
-            transition: all 0.3s ease;
-        }
-        .entry-animation {
-            animation: entrySlide 0.4s ease-out;
-        }
-        @keyframes entrySlide {
-            from { opacity: 0; transform: translateX(-20px); }
-            to { opacity: 1; transform: translateX(0); }
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.3s ease;
         }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800">
-    <div class="flex h-screen overflow-hidden">
-        <!-- Mobile sidebar toggle -->
-        <div class="fixed md:hidden inset-0 bg-black bg-opacity-50 z-10 hidden" id="mobileSidebarOverlay"></div>
-        
-        <!-- Sidebar -->
-        <div id="sidebar" class="w-64 bg-indigo-800 text-white fixed h-full z-20 -translate-x-full md:translate-x-0 transition-transform duration-300">
-            <div class="p-4 flex items-center justify-between border-b border-indigo-700">
-                <h1 class="text-2xl font-bold flex items-center">
-                    <i class="fas fa-wallet mr-2"></i>
-                    <span class="bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">DeepSite V2</span>
-                </h1>
-                <button id="closeSidebar" class="md:hidden text-white">
+<body class="bg-gray-100 font-sans">
+    <!-- Mobile Menu Button -->
+    <div class="md:hidden fixed top-4 left-4 z-50">
+        <button id="menuToggle" class="p-2 rounded-lg bg-indigo-600 text-white">
+            <i class="fas fa-bars"></i>
+        </button>
+    </div>
+
+    <!-- Add Transaction Modal -->
+    <div id="addTransactionModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black bg-opacity-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div class="flex justify-between items-center border-b p-4">
+                <h3 class="text-lg font-medium">Nova Transação</h3>
+                <button id="closeTransactionModal" class="text-gray-500 hover:text-gray-700">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="p-4">
-                <div class="mb-6 flex flex-col">
-                    <div class="bg-indigo-700 rounded-lg p-4 mb-2">
-                        <p class="text-xs text-indigo-200">Saldo Atual</p>
-                        <h2 class="text-2xl font-bold" id="currentBalance">R$ 5.267,35</h2>
-                        <div class="flex justify-between text-xs mt-1">
-                            <span class="text-green-300">+ R$ 2.800,00</span>
-                            <span class="text-red-300">- R$ 1.532,65</span>
-                        </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                        <select class="w-full p-2 border rounded-md">
+                            <option value="income">Receita</option>
+                            <option value="expense">Despesa</option>
+                        </select>
                     </div>
-                    <select class="bg-indigo-700 text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        <option>Janeiro 2023</option>
-                        <option selected>Fevereiro 2023</option>
-                        <option>Março 2023</option>
-                    </select>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Valor</label>
+                        <input type="number" placeholder="R$" class="w-full p-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                        <input type="text" placeholder="Descrição da transação" class="w-full p-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Data</label>
+                        <input type="date" class="w-full p-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                        <select class="w-full p-2 border rounded-md">
+                            <option>Salário</option>
+                            <option>Aluguel</option>
+                            <option>Alimentação</option>
+                            <option>Transporte</option>
+                            <option>Lazer</option>
+                            <option>Outros</option>
+                        </select>
+                    </div>
                 </div>
-                
-                <nav>
-                    <ul>
-                        <li>
-                            <a href="#" class="sidebar-link active" data-tab="dashboard">
-                                <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" class="sidebar-link" data-tab="monthly">
-                                <i class="fas fa-calendar-alt mr-3"></i> Controle Mensal
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" class="sidebar-link" data-tab="projects">
-                                <i class="fas fa-project-diagram mr-3"></i> Projetos
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" class="sidebar-link" data-tab="goals">
-                                <i class="fas fa-bullseye mr-3"></i> Metas
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" class="sidebar-link" data-tab="annual">
-                                <i class="fas fa-chart-line mr-3"></i> Planejamento Anual
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" class="sidebar-link" data-tab="debts">
-                                <i class="fas fa-credit-card mr-3"></i> Dívidas
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" class="sidebar-link" data-tab="investments">
-                                <i class="fas fa-chart-pie mr-3"></i> Investimentos
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" class="sidebar-link" data-tab="settings">
-                                <i class="fas fa-cog mr-3"></i> Configurações
-                            </a>
-                        </li>
-                    </ul>
-                </nav>
             </div>
-            <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-indigo-700">
-                <div class="text-center text-indigo-300 text-sm">
-                    <p>© 2023 DeepSite Finance</p>
+            <div class="flex justify-end space-x-3 border-t p-4">
+                <button id="cancelTransaction" class="px-4 py-2 text-gray-600 hover:text-gray-800">
+                    Cancelar
+                </button>
+                <button id="saveTransaction" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                    Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay -->
+    <div id="overlay" class="overlay"></div>
+
+    <div class="flex min-h-screen">
+        <!-- Sidebar -->
+        <div id="sidebar" class="sidebar bg-gray-800 text-white w-64 flex-shrink-0">
+            <div class="p-4 flex items-center justify-between border-b border-gray-700">
+                <h1 class="text-xl font-bold">Finanças Pessoais</h1>
+                <button id="closeMenu" class="md:hidden p-1 text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <nav class="p-2">
+                <ul>
+                    <li>
+                        <a href="#" class="tab-link active flex items-center p-3 rounded-lg bg-indigo-700 text-white">
+                            <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="tab-link flex items-center p-3 rounded-lg hover:bg-gray-700 text-gray-300">
+                            <i class="fas fa-exchange-alt mr-3"></i> Fluxo Mensal
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="tab-link flex items-center p-3 rounded-lg hover:bg-gray-700 text-gray-300">
+                            <i class="fas fa-plane mr-3"></i> Projetos
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="tab-link flex items-center p-3 rounded-lg hover:bg-gray-700 text-gray-300">
+                            <i class="fas fa-bullseye mr-3"></i> Metas
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="tab-link flex items-center p-3 rounded-lg hover:bg-gray-700 text-gray-300">
+                            <i class="fas fa-calendar mr-3"></i> Planejamento Anual
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="tab-link flex items-center p-3 rounded-lg hover:bg-gray-700 text-gray-300">
+                            <i class="fas fa-credit-card mr-3"></i> Dívidas
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="tab-link flex items-center p-3 rounded-lg hover:bg-gray-700 text-gray-300">
+                            <i class="fas fa-chart-line mr-3"></i> Investimentos
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="tab-link flex items-center p-3 rounded-lg hover:bg-gray-700 text-gray-300">
+                            <i class="fas fa-cog mr-3"></i> Configurações
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <div class="p-4 absolute bottom-0 w-full">
+                <div class="text-sm text-gray-400">
+                    <p>Saldo Atual:</p>
+                    <p class="text-xl font-bold text-green-400">R$ 5.243,73</p>
                 </div>
             </div>
         </div>
 
-        <!-- Main content -->
-        <div class="flex-1 flex flex-col overflow-hidden ml-0 md:ml-64">
-            <!-- Top bar -->
-            <header class="bg-white border-b border-gray-200 flex items-center justify-between p-4">
-                <div class="flex items-center">
-                    <button id="toggleSidebar" class="md:hidden mr-4 text-indigo-600">
-                        <i class="fas fa-bars text-xl"></i>
-                    </button>
-                    <h2 class="text-xl font-semibold capitalize" id="currentTabTitle">Dashboard</h2>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <div class="relative">
-                        <i class="fas fa-bell text-gray-500"></i>
-                        <span class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">2</span>
+        <!-- Main Content -->
+        <div class="flex-1 overflow-auto">
+            <!-- Header -->
+            <header class="bg-white shadow-sm p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-800" id="currentTabTitle">Dashboard</h2>
+                        <p class="text-sm text-gray-500">Resumo financeiro</p>
                     </div>
-                    <div class="flex items-center space-x-2">
-                        <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white">
-                            <span class="text-sm font-medium">JD</span>
+                    <div class="flex items-center space-x-4">
+                        <div class="relative">
+                            <select class="bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 pr-8 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option>Novembro 2023</option>
+                                <option>Outubro 2023</option>
+                                <option>Setembro 2023</option>
+                            </select>
+                            <i class="fas fa-chevron-down absolute right-3 top-3 text-gray-500 pointer-events-none"></i>
                         </div>
-                        <span class="hidden md:inline text-sm font-medium">John Doe</span>
+                        <button class="p-2 rounded-full bg-gray-100 hover:bg-gray-200">
+                            <i class="fas fa-bell text-gray-600"></i>
+                        </button>
+                        <div class="flex items-center cursor-pointer" id="userProfileBtn">
+                            <img src="https://randomuser.me/api/portraits/women/44.jpg" alt="User" class="w-8 h-8 rounded-full">
+                        </div>
                     </div>
                 </div>
             </header>
 
-            <!-- Main content area -->
-            <main class="flex-1 overflow-y-auto p-4 bg-gray-50">
-                <!-- Dashboard Tab -->
-                <div id="dashboard" class="tab-content active">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                        <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <p class="text-xs text-gray-500">Receita Total</p>
-                                    <h3 class="text-2xl font-bold text-green-600">R$ 2.800,00</h3>
-                                </div>
-                                <i class="fas fa-arrow-up text-green-500 bg-green-100 p-2 rounded-full"></i>
+            <!-- Dashboard Tab Content -->
+            <div id="dashboardTab" class="tab-content p-4 fade-in">
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <!-- Total Income -->
+                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">Receita Total</p>
+                                <p class="text-2xl font-bold text-green-600">R$ 4.250,00</p>
                             </div>
-                            <p class="text-xs text-gray-500 mt-2">+12% vs mês anterior</p>
-                        </div>
-                        <div class="bg-white p-4 rounded-lg shadow border-l-4 border-red-500">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <p class="text-xs text-gray-500">Despesa Total</p>
-                                    <h3 class="text-2xl font-bold text-red-600">R$ 1.532,65</h3>
-                                </div>
-                                <i class="fas fa-arrow-down text-red-500 bg-red-100 p-2 rounded-full"></i>
+                            <div class="p-2 rounded-full bg-green-100 text-green-600">
+                                <i class="fas fa-arrow-up"></i>
                             </div>
-                            <p class="text-xs text-gray-500 mt-2">-5% vs mês anterior</p>
                         </div>
-                        <div class="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <p class="text-xs text-gray-500">Patrimônio</p>
-                                    <h3 class="text-2xl font-bold text-purple-600">R$ 28.431,70</h3>
-                                </div>
-                                <i class="fas fa-chart-line text-purple-500 bg-purple-100 p-2 rounded-full"></i>
-                            </div>
-                            <p class="text-xs text-gray-500 mt-2">+6,8% este ano</p>
-                        </div>
-                        <div class="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-500">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <p class="text-xs text-gray-500">Economias</p>
-                                    <h3 class="text-2xl font-bold text-yellow-600">R$ 5.200,00</h3>
-                                </div>
-                                <i class="fas fa-piggy-bank text-yellow-500 bg-yellow-100 p-2 rounded-full"></i>
-                            </div>
-                            <p class="text-xs text-gray-500 mt-2">42% da meta anual</p>
-                        </div>
+                        <p class="text-xs text-gray-500 mt-2"><span class="text-green-500">12%</span> em relação ao mês passado</p>
                     </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-                        <div class="bg-white p-4 rounded-lg shadow lg:col-span-2">
-                            <div class="flex justify-between items-center mb-4">
-                                <h3 class="font-semibold">Comparativo Mensal</h3>
-                                <select class="border rounded-md px-2 py-1 text-sm">
-                                    <option>Últimos 6 meses</option>
-                                    <option selected>Este ano</option>
-                                    <option>Últimos 12 meses</option>
-                                </select>
+                    
+                    <!-- Total Expenses -->
+                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-red-500">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">Despesa Total</p>
+                                <p class="text-2xl font-bold text-red-600">R$ 3.721,50</p>
                             </div>
-                            <canvas id="monthlyComparisonChart" height="250"></canvas>
-                        </div>
-                        <div class="bg-white p-4 rounded-lg shadow">
-                            <div class="flex justify-between items-center mb-4">
-                                <h3 class="font-semibold">Distribuição de Despesas</h3>
-                                <select class="border rounded-md px-2 py-1 text-sm">
-                                    <option selected>Este mês</option>
-                                    <option>Últimos 3 meses</option>
-                                    <option>Este ano</option>
-                                </select>
+                            <div class="p-2 rounded-full bg-red-100 text-red-600">
+                                <i class="fas fa-arrow-down"></i>
                             </div>
-                            <canvas id="expensesChart" height="250"></canvas>
                         </div>
+                        <p class="text-xs text-gray-500 mt-2"><span class="text-red-500">8%</span> em relação ao mês passado</p>
                     </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-                        <div class="bg-white p-4 rounded-lg shadow">
-                            <div class="flex justify-between items-center mb-4">
-                                <h3 class="font-semibold">Progresso de Metas</h3>
-                                <button class="text-blue-500 text-sm font-medium">Ver todas</button>
+                    
+                    <!-- Savings -->
+                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">Economias</p>
+                                <p class="text-2xl font-bold text-blue-600">R$ 528,50</p>
                             </div>
-                            <div class="space-y-4">
-                                <div>
-                                    <div class="flex justify-between text-sm mb-1">
-                                        <span>Reserva de emergência</span>
-                                        <span>72%</span>
-                                    </div>
-                                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                        <div class="bg-green-500 h-2.5 rounded-full progress-bar" style="width: 72%"></div>
-                                    </div>
-                                    <div class="flex justify-between text-xs text-gray-500 mt-1">
-                                        <span>R$ 7.200/10.000</span>
-                                        <span>Junho 2023</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div class="flex justify-between text-sm mb-1">
-                                        <span>Viagem Europa</span>
-                                        <span>35%</span>
-                                    </div>
-                                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                        <div class="bg-blue-500 h-2.5 rounded-full progress-bar" style="width: 35%"></div>
-                                    </div>
-                                    <div class="flex justify-between text-xs text-gray-500 mt-1">
-                                        <span>R$ 3.500/10.000</span>
-                                        <span>Dezembro 2023</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div class="flex justify-between text-sm mb-1">
-                                        <span>Novo Notebook</span>
-                                        <span>60%</span>
-                                    </div>
-                                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                        <div class="bg-purple-500 h-2.5 rounded-full progress-bar" style="width: 60%"></div>
-                                    </div>
-                                    <div class="flex justify-between text-xs text-gray-500 mt-1">
-                                        <span>R$ 3.000/5.000</span>
-                                        <span>Abril 2023</span>
-                                    </div>
-                                </div>
+                            <div class="p-2 rounded-full bg-blue-100 text-blue-600">
+                                <i class="fas fa-piggy-bank"></i>
                             </div>
                         </div>
-                        <div class="bg-white p-4 rounded-lg shadow">
-                            <div class="flex justify-between items-center mb-4">
-                                <h3 class="font-semibold">Dicas de Economia</h3>
-                                <i class="fas fa-lightbulb text-yellow-400"></i>
+                        <p class="text-xs text-gray-500 mt-2"><span class="text-blue-500">3.5%</span> da receita</p>
+                    </div>
+                    
+                    <!-- Balance -->
+                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-indigo-500">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">Saldo do Mês</p>
+                                <p class="text-2xl font-bold text-indigo-600">R$ 528,50</p>
                             </div>
-                            <div class="space-y-3">
-                                <div class="p-3 bg-blue-50 rounded-lg border border-blue-100 flex items-start entry-animation">
-                                    <i class="fas fa-info-circle text-blue-500 mt-1 mr-3"></i>
-                                    <div>
-                                        <p class="font-medium">Você gastou R$ 320 com delivery este mês. Considere cozinhar mais em casa.</p>
-                                        <p class="text-xs text-gray-500 mt-1">Potencial economia: ~R$ 150/mês</p>
-                                    </div>
-                                </div>
-                                <div class="p-3 bg-green-50 rounded-lg border border-green-100 flex items-start entry-animation">
-                                    <i class="fas fa-check-circle text-green-500 mt-1 mr-3"></i>
-                                    <div>
-                                        <p class="font-medium">Você economizou R$ 250 comparado ao mês passado. Ótimo trabalho!</p>
-                                        <p class="text-xs text-gray-500 mt-1">Continue assim para alcançar suas metas.</p>
-                                    </div>
-                                </div>
-                                <div class="p-3 bg-yellow-50 rounded-lg border border-yellow-100 flex items-start entry-animation">
-                                    <i class="fas fa-exclamation-circle text-yellow-500 mt-1 mr-3"></i>
-                                    <div>
-                                        <p class="font-medium">3 assinaturas se renovam na próxima semana. Avalie se ainda precisa de todas.</p>
-                                        <p class="text-xs text-gray-500 mt-1">Total: R$ 87,90/mês</p>
-                                    </div>
-                                </div>
+                            <div class="p-2 rounded-full bg-indigo-100 text-indigo-600">
+                                <i class="fas fa-wallet"></i>
                             </div>
                         </div>
+                        <p class="text-xs text-gray-500 mt-2">Em relação ao previsto: <span class="text-green-500">+R$ 120,00</span></p>
                     </div>
                 </div>
 
-                <!-- Monthly Control Tab -->
-                <div id="monthly" class="tab-content">
-                    <div class="flex justify-between items-center mb-6">
-                        <div>
-                            <h2 class="text-xl font-semibold">Controle Mensal</h2>
-                            <p class="text-gray-500 text-sm">Fevereiro 2023</p>
+                <!-- Charts Row -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                    <!-- Income vs Expenses Chart -->
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <h3 class="font-medium text-gray-800 mb-4">Receita vs Despesa</h3>
+                        <canvas id="incomeExpenseChart" height="300"></canvas>
+                    </div>
+                    
+                    <!-- Expense Categories Chart -->
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <h3 class="font-medium text-gray-800 mb-4">Distribuição de Despesas</h3>
+                        <canvas id="expenseCategoriesChart" height="300"></canvas>
+                    </div>
+                </div>
+
+                <!-- Second Row -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+                    <!-- Financial Health -->
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-medium text-gray-800">Saúde Financeira</h3>
+                            <span class="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Boa</span>
                         </div>
-                        <button class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors flex items-center">
-                            <i class="fas fa-plus mr-2"></i> Novo Lançamento
+                        <div class="space-y-3">
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>Taxa de Economia</span>
+                                    <span>12.4%</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-bar-fill bg-green-500" style="width: 12.4%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>Dívida/Receita</span>
+                                    <span>21%</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-bar-fill bg-yellow-500" style="width: 21%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>Gastos Essenciais</span>
+                                    <span>58%</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-bar-fill bg-blue-500" style="width: 58%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 pt-4 border-t border-gray-200">
+                            <h4 class="text-sm font-medium mb-2">Dicas de Economia</h4>
+                            <ul class="text-sm space-y-2">
+                                <li class="flex items-start">
+                                    <i class="fas fa-lightbulb text-yellow-500 mr-2 mt-0.5"></i>
+                                    Reduza em 10% os gastos com alimentação fora de casa (economize ~R$120/mês)
+                                </li>
+                                <li class="flex items-start">
+                                    <i class="fas fa-lightbulb text-yellow-500 mr-2 mt-0.5"></i>
+                                    Considere refinanciar seu empréstimo para obter uma taxa melhor
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Active Goals -->
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-medium text-gray-800">Metas Ativas</h3>
+                            <button class="text-sm text-indigo-600 hover:text-indigo-800">Ver todas</button>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="font-medium">Reserva Emergencial</span>
+                                    <span class="text-gray-600">25.000/10.000 (42%)</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-bar-fill bg-indigo-500" style="width: 42%"></div>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Meta: R$25.000 • Economizado: R$10.500</p>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="font-medium">Viagem Europa</span>
+                                    <span class="text-gray-600">15.000/3.200 (21%)</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-bar-fill bg-purple-500" style="width: 21%"></div>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Prazo: 12 meses • R$980/mês</p>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="font-medium">Notebook Novo</span>
+                                    <span class="text-gray-600">4.500/3.800 (84%)</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-bar-fill bg-green-500" style="width: 84%"></div>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Faltam R$700 • Previsão: 1 mês</p>
+                            </div>
+                        </div>
+                        <button class="mt-4 w-full py-2 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 text-sm font-medium">
+                            + Adicionar Nova Meta
                         </button>
                     </div>
-                    
-                    <div class="mb-4 flex flex-wrap items-center gap-4">
-                        <div class="flex-1 min-w-[200px]">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-                            <select class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option>Todos</option>
-                                <option>Receita</option>
-                                <option>Despesa</option>
-                            </select>
-                        </div>
-                        <div class="flex-1 min-w-[200px]">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-                            <select class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option>Todas categorias</option>
-                                <option>Alimentação</option>
-                                <option>Moradia</option>
-                                <option>Transporte</option>
-                                <option>Lazer</option>
-                                <option>Educação</option>
-                                <option>Salário</option>
-                            </select>
-                        </div>
-                        <div class="flex-1 min-w-[200px]">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Período</label>
-                            <select class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option>Este mês</option>
-                                <option>Últimos 7 dias</option>
-                                <option>Últimos 30 dias</option>
-                                <option>Personalizado</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white rounded-lg shadow overflow-hidden">
-                        <div class="overflow-x-auto scroll-container">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoria</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Forma de Pagamento</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">05/02/2023</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm font-medium text-gray-900">Salário</div>
-                                            <div class="text-sm text-gray-500">Empresa XYZ</div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <div class="w-4 h-4 bg-green-500 rounded-full mr-2"></div>
-                                                <div class="text-sm text-gray-900">Salário</div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Conta Corrente</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">R$ 2.500,00</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button class="text-indigo-600 hover:text-indigo-900 mr-3"><i class="fas fa-edit"></i></button>
-                                            <button class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">10/02/2023</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm font-medium text-gray-900">Aluguel</div>
-                                            <div class="text-sm text-gray-500">Apartamento</div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <div class="w-4 h-4 bg-red-500 rounded-full mr-2"></div>
-                                                <div class="text-sm text-gray-900">Moradia</div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Débito Automático</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">R$ 1.200,00</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button class="text-indigo-600 hover:text-indigo-900 mr-3"><i class="fas fa-edit"></i></button>
-                                            <button class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">12/02/2023</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm font-medium text-gray-900">Supermercado</div>
-                                            <div class="text-sm text-gray-500">Compras do mês</div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <div class="w-4 h-4 bg-red-500 rounded-full mr-2"></div>
-                                                <div class="text-sm text-gray-900">Alimentação</div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Cartão de Crédito</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">R$ 420,35</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button class="text-indigo-600 hover:text-indigo-900 mr-3"><i class="fas fa-edit"></i></button>
-                                            <button class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">15/02/2023</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm font-medium text-gray-900">Freelance</div>
-                                            <div class="text-sm text-gray-500">Projeto Web</div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <div class="w-4 h-4 bg-green-500 rounded-full mr-2"></div>
-                                                <div class="text-sm text-gray-900">Renda Extra</div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">PIX</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">R$ 300,00</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button class="text-indigo-600 hover:text-indigo-900 mr-3"><i class="fas fa-edit"></i></button>
-                                            <button class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">20/02/2023</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm font-medium text-gray-900">Academia</div>
-                                            <div class="text-sm text-gray-500">Mensalidade</div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <div class="w-4 h-4 bg-red-500 rounded-full mr-2"></div>
-                                                <div class="text-sm text-gray-900">Saúde</div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Débito Automático</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">R$ 89,90</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button class="text-indigo-600 hover:text-indigo-900 mr-3"><i class="fas fa-edit"></i></button>
-                                            <button class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="bg-gray-50 px-6 py-4 flex items-center justify-between border-t border-gray-200">
-                            <div class="flex-1 flex justify-between sm:hidden">
-                                <a href="#" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"> Anterior </a>
-                                <a href="#" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"> Próximo </a>
-                            </div>
-                            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                                <div>
-                                    <p class="text-sm text-gray-700">Mostrando <span class="font-medium">1</span> a <span class="font-medium">5</span> de <span class="font-medium">24</span> resultados</p>
-                                </div>
-                                <div>
-                                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                                        <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                                            <span class="sr-only">Previous</span>
-                                            <i class="fas fa-chevron-left h-5 w-5"></i>
-                                        </a>
-                                        <a href="#" aria-current="page" class="z-10 bg-indigo-50 border-indigo-500 text-indigo-600 relative inline-flex items-center px-4 py-2 border text-sm font-medium"> 1 </a>
-                                        <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium"> 2 </a>
-                                        <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium"> 3 </a>
-                                        <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                                            <span class="sr-only">Next</span>
-                                            <i class="fas fa-chevron-right h-5 w-5"></i>
-                                        </a>
-                                    </nav>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Projects Tab -->
-                <div id="projects" class="tab-content">
-                    <div class="flex justify-between items-center mb-6">
-                        <div>
-                            <h2 class="text-xl font-semibold">Projetos Especiais</h2>
-                            <p class="text-gray-500 text-sm">Acompanhe suas metas financeiras especiais</p>
+                    <!-- Recent Transactions -->
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-medium text-gray-800">Lançamentos Recentes</h3>
+                            <button class="text-sm text-indigo-600 hover:text-indigo-800">Ver tudo</button>
                         </div>
-                        <button class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors flex items-center">
-                            <i class="fas fa-plus mr-2"></i> Novo Projeto
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg">
+                                <div class="flex items-center">
+                                    <div class="p-2 rounded-full bg-green-100 text-green-600 mr-3">
+                                        <i class="fas fa-hand-holding-usd"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium text-sm">Salário</p>
+                                        <p class="text-xs text-gray-500">02 Nov • Conta Corrente</p>
+                                    </div>
+                                </div>
+                                <p class="font-medium text-green-600">R$ 3.500,00</p>
+                            </div>
+                            <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg">
+                                <div class="flex items-center">
+                                    <div class="p-2 rounded-full bg-red-100 text-red-600 mr-3">
+                                        <i class="fas fa-home"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium text-sm">Aluguel</p>
+                                        <p class="text-xs text-gray-500">05 Nov • Débito Automático</p>
+                                    </div>
+                                </div>
+                                <p class="font-medium text-red-600">-R$ 1.250,00</p>
+                            </div>
+                            <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg">
+                                <div class="flex items-center">
+                                    <div class="p-2 rounded-full bg-red-100 text-red-600 mr-3">
+                                        <i class="fas fa-utensils"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium text-sm">Supermercado</p>
+                                        <p class="text-xs text-gray-500">07 Nov • Cartão de Crédito</p>
+                                    </div>
+                                </div>
+                                <p class="font-medium text-red-600">-R$ 420,35</p>
+                            </div>
+                            <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg">
+                                <div class="flex items-center">
+                                    <div class="p-2 rounded-full bg-blue-100 text-blue-600 mr-3">
+                                        <i class="fas fa-exchange-alt"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium text-sm">Transferência</p>
+                                        <p class="text-xs text-gray-500">09 Nov • Para Investimentos</p>
+                                    </div>
+                                </div>
+                                <p class="font-medium text-blue-600">-R$ 500,00</p>
+                            </div>
+                        </div>
+                        <button class="mt-4 w-full py-2 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 text-sm font-medium">
+                            + Adicionar Transação
                         </button>
                     </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                        <div class="bg-white p-6 rounded-lg shadow-lg border-t-4 border-blue-500 flex flex-col h-full">
-                            <div class="flex justify-between items-start mb-4">
-                                <h3 class="text-lg font-bold">Viagem à Europa</h3>
-                                <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">Ativo</span>
-                            </div>
-                            <div class="mb-4 flex-1">
-                                <p class="text-gray-600 mb-3">Economia para viagem de 3 semanas em agosto/2023</p>
-                                <div class="space-y-3">
-                                    <div>
-                                        <div class="flex justify-between text-sm mb-1">
-                                            <span>Progresso</span>
-                                            <span>35%</span>
-                                        </div>
-                                        <div class="w-full bg-gray-200 rounded-full h-2">
-                                            <div class="bg-blue-500 h-2 rounded-full progress-bar" style="width: 35%"></div>
-                                        </div>
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-2 text-sm">
-                                        <div>
-                                            <p class="text-gray-500">Meta</p>
-                                            <p class="font-semibold">R$ 10.000</p>
-                                        </div>
-                                        <div>
-                                            <p class="text-gray-500">Acumulado</p>
-                                            <p class="font-semibold">R$ 3.500</p>
-                                        </div>
-                                        <div>
-                                            <p class="text-gray-500">Início</p>
-                                            <p>Dez/2022</p>
-                                        </div>
-                                        <div>
-                                            <p class="text-gray-500">Prazo</p>
-                                            <p>Ago/2023</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="pt-4 border-t border-gray-100 flex justify-between">
-                                <button class="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                                    <i class="fas fa-eye mr-1"></i> Detalhes
-                                </button>
-                                <button class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
-                                    <i class="fas fa-edit mr-1"></i> Editar
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="bg-white p-6 rounded-lg shadow-lg border-t-4 border-purple-500 flex flex-col h-full">
-                            <div class="flex justify-between items-start mb-4">
-                                <h3 class="text-lg font-bold">Notebook Novo</h3>
-                                <span class="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">Ativo</span>
-                            </div>
-                            <div class="mb-4 flex-1">
-                                <p class="text-gray-600 mb-3">Aquisição de notebook para trabalho</p>
-                                <div class="space-y-3">
-                                    <div>
-                                        <div class="flex justify-between text-sm mb-1">
-                                            <span>Progresso</span>
-                                            <span>60%</span>
-                                        </div>
-                                        <div class="w-full bg-gray-200 rounded-full h-2">
-                                            <div class="bg-purple-500 h-2 rounded-full progress-bar" style="width: 60%"></div>
-                                        </div>
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-2 text-sm">
-                                        <div>
-                                            <p class="text-gray-500">Meta</p>
-                                            <p class="font-semibold">R$ 5.000</p>
-                                        </div>
-                                        <div>
-                                            <p class="text-gray-500">Acumulado</p>
-                                            <p class="font-semibold">R$ 3.000</p>
-                                        </div>
-                                        <div>
-                                            <p class="text-gray-500">Início</p>
-                                            <p>Jan/2023</p>
-                                        </div>
-                                        <div>
-                                            <p class="text-gray-500">Prazo</p>
-                                            <p>Abr/2023</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="pt-4 border-t border-gray-100 flex justify-between">
-                                <button class="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                                    <i class="fas fa-eye mr-1"></i> Detalhes
-                                </button>
-                                <button class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
-                                    <i class="fas fa-edit mr-1"></i> Editar
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="bg-white p-6 rounded-lg shadow-lg border-t-4 border-green-500 flex flex-col h-full">
-                            <div class="flex justify-between items-start mb-4">
-                                <h3 class="text-lg font-bold">Reserva de Emergência</h3>
-                                <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Ativo</span>
-                            </div>
-                            <div class="mb-4 flex-1">
-                                <p class="text-gray-600 mb-3">Fundo para imprevistos (6 meses de despesas)</p>
-                                <div class="space-y-3">
-                                    <div>
-                                        <div class="flex justify-between text-sm mb-1">
-                                            <span>Progresso</span>
-                                            <span>72%</span>
-                                        </div>
-                                        <div class="w-full bg-gray-200 rounded-full h-2">
-                                            <div class="bg-green-500 h-2 rounded-full progress-bar" style="width: 72%"></div>
-                                        </div>
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-2 text-sm">
-                                        <div>
-                                            <p class="text-gray-500">Meta</p>
-                                            <p class="font-semibold">R$ 10.000</p>
-                                        </div>
-                                        <div>
-                                            <p class="text-gray-500">Acumulado</p>
-                                            <p class="font-semibold">R$ 7.200</p>
-                                        </div>
-                                        <div>
-                                            <p class="text-gray-500">Início</p>
-                                            <p>Jul/2022</p>
-                                        </div>
-                                        <div>
-                                            <p class="text-gray-500">Prazo</p>
-                                            <p>Jun/2023</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="pt-4 border-t border-gray-100 flex justify-between">
-                                <button class="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                                    <i class="fas fa-eye mr-1"></i> Detalhes
-                                </button>
-                                <button class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
-                                    <i class="fas fa-edit mr-1"></i> Editar
-                                </button>
-                            </div>
+                </div>
+            </div>
+
+            <!-- Monthly Flow Tab Content (Hidden by default) -->
+            <div id="monthlyFlowTab" class="tab-content p-4 hidden">
+                <div class="bg-white rounded-lg shadow p-4 mb-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-lg font-semibold text-gray-800">Controle Mensal</h2>
+                        <div class="flex space-x-3">
+                            <button class="px-3 py-1 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm">
+                                <i class="fas fa-filter mr-1"></i> Filtrar
+                            </button>
+                            <button class="px-3 py-1 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm">
+                                <i class="fas fa-plus mr-1"></i> Novo
+                            </button>
                         </div>
                     </div>
-                    
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-semibold mb-4">Movimentações dos Projetos</h3>
-                        <div class="overflow-x-auto scroll-container">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Projeto</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">05/02/2023</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">Viagem Europa</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Depósito</span>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm text-gray-500">Economia mensal</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">+ R$ 500,00</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button class="text-indigo-600 hover:text-indigo-900 mr-3"><i class="fas fa-edit"></i></button>
-                                            <button class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">10/02/2023</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-purple-600">Notebook Novo</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Depósito</span>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm text-gray-500">Economia extra</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">+ R$ 300,00</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button class="text-indigo-600 hover:text-indigo-900 mr-3"><i class="fas fa-edit"></i></button>
-                                            <button class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">18/02/2023</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">Viagem Europa</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Gasto</span>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm text-gray-500">Passaporte</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">- R$ 257,00</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button class="text-indigo-600 hover:text-indigo-900 mr-3"><i class="fas fa-edit"></i></button>
-                                            <button class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="text-left text-sm text-gray-500 border-b">
+                                    <th class="pb-3">Data</th>
+                                    <th class="pb-3">Descrição</th>
+                                    <th class="pb-3">Categoria</th>
+                                    <th class="pb-3">Método</th>
+                                    <th class="pb-3 text-right">Valor</th>
+                                    <th class="pb-3"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y text-sm">
+                                <!-- Income Row -->
+                                <tr class="hover:bg-gray-50">
+                                    <td class="py-3">02/11</td>
+                                    <td class="py-3 font-medium">Salário - Empresa ABC</td>
+                                    <td class="py-3">
+                                        <span class="px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs">Renda</span>
+                                    </td>
+                                    <td class="py-3">
+                                        <span>Conta Corrente</span>
+                                    </td>
+                                    <td class="py-3 text-right font-medium text-green-600">R$ 3.500,00</td>
+                                    <td class="py-3 text-right">
+                                        <div class="relative">
+                                            <button class="text-gray-400 hover:text-gray-600 dropdown-toggle">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <div class="dropdown-menu absolute right-0 mt-1 w-32 bg-white rounded-md shadow-lg py-1 z-50 hidden">
+                                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                                    <i class="fas fa-edit mr-2"></i> Editar
+                                                </a>
+                                                <a href="#" class="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
+                                                    <i class="fas fa-trash mr-2"></i> Excluir
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <!-- Expense Row -->
+                                <tr class="hover:bg-gray-50">
+                                    <td class="py-3">05/11</td>
+                                    <td class="py-3 font-medium">Aluguel Apartamento</td>
+                                    <td class="py-3">
+                                        <span class="px-2 py-1 rounded-full bg-red-100 text-red-800 text-xs">Moradia</span>
+                                    </td>
+                                    <td class="py-3">
+                                        <span>Débito Automático</span>
+                                    </td>
+                                    <td class="py-3 text-right font-medium text-red-600">-R$ 1.250,00</td>
+                                    <td class="py-3 text-right">
+                                        <button class="text-gray-400 hover:text-gray-600">
+                                            <i class="fas fa-ellipsis-v"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <!-- More rows would go here -->
+                            </tbody>
+                        </table>
+                        <div class="mt-4 flex justify-between items-center">
+                            <p class="text-sm text-gray-500">Mostrando 2 de 45 transações</p>
+                            <nav class="flex space-x-1">
+                                <button class="px-3 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <button class="px-3 py-1 rounded bg-indigo-600 text-white">1</button>
+                                <button class="px-3 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200">2</button>
+                                <button class="px-3 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200">3</button>
+                                <button class="px-3 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </nav>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Goals Tab -->
-                <div id="goals" class="tab-content">
+            <!-- Projects Tab Content (Hidden by default) -->
+            <div id="projectsTab" class="tab-content p-4 hidden">
+                <div class="bg-white rounded-lg shadow p-4 mb-6">
                     <div class="flex justify-between items-center mb-6">
-                        <div>
-                            <h2 class="text-xl font-semibold">Metas Financeiras</h2>
-                            <p class="text-gray-500 text-sm">Acompanhe seu progresso em direção às suas metas</p>
-                        </div>
-                        <button class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors flex items-center">
-                            <i class="fas fa-plus mr-2"></i> Nova Meta
+                        <h2 class="text-lg font-semibold text-gray-800">Projetos Especiais</h2>
+                        <button class="px-3 py-1 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm">
+                            <i class="fas fa-plus mr-1"></i> Novo Projeto
                         </button>
                     </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <h3 class="text-lg font-semibold mb-4">Resumo de Metas</h3>
-                            <div class="space-y-4">
-                                <div>
-                                    <div class="flex justify-between mb-1">
-                                        <span class="text-sm font-medium">Meta 1: Reserva de Emergência</span>
-                                        <span class="text-sm font-medium">72%</span>
-                                    </div>
-                                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                        <div class="bg-green-500 h-2.5 rounded-full" style="width: 72%"></div>
-                                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- Project Card 1 -->
+                        <div class="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="font-semibold text-indigo-700">Viagem à Europa</h3>
+                                <span class="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs">Em andamento</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-4">Tour por França, Itália e Espanha em 15 dias</p>
+                            <div class="mb-4">
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-gray-500">Progresso</span>
+                                    <span class="font-medium">21%</span>
                                 </div>
-                                <div>
-                                    <div class="flex justify-between mb-1">
-                                        <span class="text-sm font-medium">Meta 2: Quitar Dívida Cartão</span>
-                                        <span class="text-sm font-medium">30%</span>
-                                    </div>
-                                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                        <div class="bg-blue-500 h-2.5 rounded-full" style="width: 30%"></div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div class="flex justify-between mb-1">
-                                        <span class="text-sm font-medium">Meta 3: Ingresso Mestrado</span>
-                                        <span class="text-sm font-medium">80%</span>
-                                    </div>
-                                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                        <div class="bg-purple-500 h-2.5 rounded-full" style="width: 80%"></div>
-                                    </div>
+                                <div class="progress-bar">
+                                    <div class="progress-bar-fill bg-purple-500" style="width: 21%"></div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <h3 class="text-lg font-semibold mb-4">Metas Concluídas Recentemente</h3>
-                            <div class="space-y-3">
-                                <div class="p-3 bg-green-50 rounded-lg border border-green-100 flex items-start">
-                                    <i class="fas fa-check-circle text-green-500 mt-1 mr-3"></i>
-                                    <div>
-                                        <p class="font-medium">TV Nova (Concluído em 10/01/2023)</p>
-                                        <p class="text-xs text-gray-500 mt-1">Valor: R$ 2.200,00</p>
-                                    </div>
+                            <div class="flex justify-between text-sm">
+                                <div>
+                                    <p class="text-gray-500">Orçamento</p>
+                                    <p class="font-medium">R$ 15.000</p>
                                 </div>
-                                <div class="p-3 bg-green-50 rounded-lg border border-green-100 flex items-start">
-                                    <i class="fas fa-check-circle text-green-500 mt-1 mr-3"></i>
-                                    <div>
-                                        <p class="font-medium">Curso de Inglês (Concluído em 15/12/2022)</p>
-                                        <p class="text-xs text-gray-500 mt-1">Valor: R$ 1.500,00</p>
-                                    </div>
+                                <div class="text-right">
+                                    <p class="text-gray-500">Economizado</p>
+                                    <p class="font-medium">R$ 3.200</p>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white rounded-lg shadow overflow-hidden mb-6">
-                        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                            <h3 class="text-lg font-semibold">Todas as Metas</h3>
-                            <div class="flex space-x-2">
-                                <select class="border-gray-200 rounded-md text-sm px-3 py-1">
-                                    <option>Todas</option>
-                                    <option>Em andamento</option>
-                                    <option>Concluídas</option>
-                                    <option>Atrasadas</option>
-                                </select>
-                                <button class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-md text-sm">
-                                    <i class="fas fa-filter mr-1"></i> Filtrar
-                                </button>
+                            <div class="mt-4 pt-3 border-t border-gray-200">
+                                <p class="text-xs text-gray-500">Prazo: Jun/2024 • R$ 980/mês</p>
                             </div>
                         </div>
-                        <div class="overflow-x-auto scroll-container">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Meta</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Alvo</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acumulado</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progresso</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                        <th scope="col" class="relative px-6 py-3"><span class="sr-only">Ações</span></th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm font-medium text-gray-900">Reserva de Emergência</div>
-                                            <div class="text-sm text-gray-500">6 meses de despesas</div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Guardar</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">R$ 10.000</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">R$ 7.200</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <div class="w-24 h-2 bg-gray-200 rounded-full mr-2">
-                                                    <div class="h-2 rounded-full bg-green-500" style="width: 72%"></div>
-                                                </div>
-                                                <span class="text-xs text-gray-500">72%</span>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Em andamento</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button class="text-indigo-600 hover:text-indigo-900 mr-3"><i class="fas fa-edit"></i></button>
-                                            <button class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm font-medium text-gray-900">Quitar Dívida Cartão</div>
-                                            <div class="text-sm text-gray-500">Cartão de crédito</div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Quitar Dívida</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">R$ 1.800</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">R$ 540</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <div class="w-24 h-2 bg-gray-200 rounded-full mr-2">
-                                                    <div class="h-2 rounded-full bg-blue-500" style="width: 30%"></div>
-                                                </div>
-                                                <span class="text-xs text-gray-500">30%</span>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Atenção</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button class="text-indigo-600 hover:text-indigo-900 mr-3"><i class="fas fa-edit"></i></button>
-                                            <button class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm font-medium text-gray-900">Ingresso Mestrado</div>
-                                            <div class="text-sm text-gray-500">Taxa de inscrição</div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Comprar algo</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">R$ 500</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">R$ 400</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <div class="w-24 h-2 bg-gray-200 rounded-full mr-2">
-                                                    <div class="h-2 rounded-full bg-purple-500" style="width: 80%"></div>
-                                                </div>
-                                                <span class="text-xs text-gray-500">80%</span>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Em andamento</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button class="text-indigo-600 hover:text-indigo-900 mr-3"><i class="fas fa-edit"></i></button>
-                                            <button class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        <!-- More project cards would go here -->
                     </div>
                 </div>
-
-                <!-- Other tabs (Annual Planning, Debts, Investments, Settings) would follow the same pattern -->
-                <div id="annual" class="tab-content">
-                    <div class="text-center py-10">
-                        <h3 class="text-xl font-semibold mb-2">Planejamento Anual</h3>
-                        <p class="text-gray-500">Visualização anual de receitas e despesas</p>
-                    </div>
-                </div>
-
-                <div id="debts" class="tab-content">
-                    <div class="text-center py-10">
-                        <h3 class="text-xl font-semibold mb-2">Dívidas e Parcelamentos</h3>
-                        <p class="text-gray-500">Acompanhamento de dívidas e financiamentos</p>
-                    </div>
-                </div>
-
-                <div id="investments" class="tab-content">
-                    <div class="text-center py-10">
-                        <h3 class="text-xl font-semibold mb-2">Investimentos</h3>
-                        <p class="text-gray-500">Monitoramento de carteira de investimentos</p>
-                    </div>
-                </div>
-
-                <div id="settings" class="tab-content">
-                    <div class="text-center py-10">
-                        <h3 class="text-xl font-semibold mb-2">Configurações</h3>
-                        <p class="text-gray-500">Personalize categorias e preferências</p>
-                    </div>
-                </div>
-            </main>
+            </div>
         </div>
     </div>
 
     <script>
-        // Sidebar toggle for mobile
-        const toggleSidebar = document.getElementById('toggleSidebar');
-        const closeSidebar = document.getElementById('closeSidebar');
+        // Mobile menu toggle
+        const menuToggle = document.getElementById('menuToggle');
         const sidebar = document.getElementById('sidebar');
-        const mobileSidebarOverlay = document.getElementById('mobileSidebarOverlay');
+        const overlay = document.getElementById('overlay');
+        const closeMenu = document.getElementById('closeMenu');
 
-        toggleSidebar.addEventListener('click', () => {
-            sidebar.classList.remove('-translate-x-full');
-            mobileSidebarOverlay.classList.remove('hidden');
+        menuToggle.addEventListener('click', () => {
+            sidebar.classList.add('open');
+            overlay.classList.add('open');
         });
 
-        closeSidebar.addEventListener('click', () => {
-            sidebar.classList.add('-translate-x-full');
-            mobileSidebarOverlay.classList.add('hidden');
+        closeMenu.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('open');
         });
 
-        mobileSidebarOverlay.addEventListener('click', () => {
-            sidebar.classList.add('-translate-x-full');
-            mobileSidebarOverlay.classList.add('hidden');
+        overlay.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('open');
         });
 
-        // Tab switching functionality
-        document.querySelectorAll('.sidebar-link').forEach(link => {
-            link.addEventListener('click', function(e) {
+        // Tab switching
+        const tabLinks = document.querySelectorAll('.tab-link');
+        const tabContents = document.querySelectorAll('.tab-content');
+        const currentTabTitle = document.getElementById('currentTabTitle');
+
+        tabLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
                 e.preventDefault();
                 
                 // Update active tab in sidebar
-                document.querySelectorAll('.sidebar-link').forEach(el => el.classList.remove('active'));
-                this.classList.add('active');
+                tabLinks.forEach(l => l.classList.remove('active', 'bg-indigo-700', 'text-white'));
+                tabLinks.forEach(l => l.classList.add('text-gray-300', 'hover:bg-gray-700'));
+                link.classList.add('active', 'bg-indigo-700', 'text-white');
+                link.classList.remove('text-gray-300', 'hover:bg-gray-700');
                 
-                // Get which tab to show
-                const tabId = this.getAttribute('data-tab');
+                // Close mobile menu if open
+                sidebar.classList.remove('open');
+                overlay.classList.remove('open');
                 
-                // Hide all tab contents
-                document.querySelectorAll('.tab-content').forEach(content => {
-                    content.classList.remove('active');
-                });
+                // Get tab ID
+                const tabName = link.textContent.trim();
                 
-                // Show selected tab content
-                document.getElementById(tabId).classList.add('active');
+                // Update tab content
+                tabContents.forEach(tab => tab.classList.add('hidden'));
                 
-                // Update tab title in header
-                document.getElementById('currentTabTitle').textContent = this.textContent.trim();
-                
-                // Close sidebar on mobile after selecting a tab
-                if (window.innerWidth < 768) {
-                    sidebar.classList.add('-translate-x-full');
-                    mobileSidebarOverlay.classList.add('hidden');
+                let tabId = '';
+                if (tabName === 'Dashboard') {
+                    tabId = 'dashboardTab';
+                    currentTabTitle.textContent = 'Dashboard';
+                } else if (tabName === 'Fluxo Mensal') {
+                    tabId = 'monthlyFlowTab';
+                    currentTabTitle.textContent = 'Fluxo Mensal';
+                } else if (tabName === 'Projetos') {
+                    tabId = 'projectsTab';
+                    currentTabTitle.textContent = 'Projetos';
                 }
+                
+                const activeTab = document.getElementById(tabId);
+                activeTab.classList.remove('hidden');
+                activeTab.classList.add('fade-in');
             });
         });
 
-        // Charts initialization
-        function initCharts() {
-            // Monthly Comparison Chart
-            const monthlyComparisonCtx = document.getElementById('monthlyComparisonChart').getContext('2d');
-            const monthlyComparisonChart = new Chart(monthlyComparisonCtx, {
+        // Initialize charts
+        document.addEventListener('DOMContentLoaded', function() {
+            // Income vs Expense Chart
+            const incomeExpenseCtx = document.getElementById('incomeExpenseChart').getContext('2d');
+            const incomeExpenseChart = new Chart(incomeExpenseCtx, {
                 type: 'bar',
                 data: {
-                    labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+                    labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov'],
                     datasets: [
                         {
                             label: 'Receita',
-                            backgroundColor: '#10B981',
-                            data: [2500, 2800, 3000, 2700, 2900, 3100, 3300, 3200, 2900, 3100, 3300, 3500]
+                            data: [3200, 3400, 3500, 3800, 4000, 4200, 3800, 3900, 4100, 4300, 4500],
+                            backgroundColor: '#4ade80',
+                            borderRadius: 4
                         },
                         {
                             label: 'Despesa',
-                            backgroundColor: '#EF4444',
-                            data: [1800, 1532, 1700, 1600, 1750, 1850, 2000, 2100, 1900, 1850, 1950, 2050]
+                            data: [2800, 3000, 3200, 3400, 3600, 3800, 3500, 3400, 3800, 4000, 3800],
+                            backgroundColor: '#f87171',
+                            borderRadius: 4
                         }
                     ]
                 },
                 options: {
                     responsive: true,
-                    scales: {
-                        x: {
-                            stacked: false,
-                        },
-                        y: {
-                            stacked: false,
-                            beginAtZero: true
-                        }
-                    },
                     plugins: {
                         legend: {
                             position: 'top',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': R$' + context.raw.toLocaleString('pt-BR');
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'R$' + value.toLocaleString('pt-BR');
+                                }
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
                         }
                     }
                 }
             });
 
-            // Expenses Distribution Chart
-            const expensesCtx = document.getElementById('expensesChart').getContext('2d');
-            const expensesChart = new Chart(expensesCtx, {
+            // Expense Categories Chart
+            const expenseCategoriesCtx = document.getElementById('expenseCategoriesChart').getContext('2d');
+            const expenseCategoriesChart = new Chart(expenseCategoriesCtx, {
                 type: 'doughnut',
                 data: {
                     labels: ['Moradia', 'Alimentação', 'Transporte', 'Lazer', 'Saúde', 'Educação', 'Outros'],
                     datasets: [{
-                        data: [1200, 420.35, 250, 180, 89.90, 200, 120],
+                        data: [1250, 420, 350, 280, 150, 200, 800],
                         backgroundColor: [
-                            '#3B82F6',
-                            '#10B981',
-                            '#F59E0B',
-                            '#8B5CF6',
-                            '#EC4899',
-                            '#06B6D4',
-                            '#64748B'
+                            '#ef4444',
+                            '#f97316',
+                            '#f59e0b',
+                            '#10b981',
+                            '#3b82f6',
+                            '#8b5cf6',
+                            '#64748b'
                         ],
-                        hoverOffset: 4
+                        borderWidth: 0
                     }]
                 },
                 options: {
@@ -1034,37 +731,22 @@
                     plugins: {
                         legend: {
                             position: 'right',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${context.label}: R$${value.toLocaleString('pt-BR')} (${percentage}%)`;
+                                }
+                            }
                         }
-                    }
+                    },
+                    cutout: '70%'
                 }
-            });
-        }
-
-        // Initialize charts when DOM is loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            initCharts();
-            
-            // Animate progress bars on tab change
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        const progressBars = entry.target.querySelectorAll('.progress-bar');
-                        progressBars.forEach(bar => {
-                            // Reset width to 0 to animate again
-                            const targetWidth = bar.style.width;
-                            bar.style.width = '0';
-                            setTimeout(() => {
-                                bar.style.width = targetWidth;
-                            }, 100);
-                        });
-                    }
-                });
-            }, { threshold: 0.1 });
-
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                observer.observe(tab);
             });
         });
     </script>
-<p style="border-radius: 8px; text-align: center; font-size: 12px; color: #fff; margin-top: 16px;position: fixed; left: 8px; bottom: 8px; z-index: 10; background: rgba(0, 0, 0, 0.8); padding: 4px 8px;">Made with <img src="https://enzostvs-deepsite.hf.space/logo.svg" alt="DeepSite Logo" style="width: 16px; height: 16px; vertical-align: middle;display:inline-block;margin-right:3px;filter:brightness(0) invert(1);"><a href="https://enzostvs-deepsite.hf.space" style="color: #fff;text-decoration: underline;" target="_blank" >DeepSite</a> - 🧬 <a href="https://enzostvs-deepsite.hf.space?remix=Willbn/finan-as-pessoais" style="color: #fff;text-decoration: underline;" target="_blank" >Remix</a></p></body>
+</body>
 </html>
